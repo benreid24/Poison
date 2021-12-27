@@ -1,24 +1,23 @@
 from enum import Enum
 from typing import List
+from base64 import b32encode
+from hashlib import sha1
+from random import random
 
 from django.db import models
+from django.core.exceptions import FieldError
+
+PK_LEN = 16
 
 
-class DataModelException(Exception):
-    pass
+def gen_key():
+    # type: () -> str
+    return sha1(str(random()).encode('utf-8')).hexdigest().upper()[:PK_LEN]
 
 
 class Player(models.Model):
+    key = models.CharField(max_length=PK_LEN, primary_key=True, default=gen_key)
     name = models.TextField(max_length=64)
-
-
-class GamePlayer(models.Model):
-    index = models.IntegerField()
-    player = models.ForeignKey(Player, on_delete=models.CASCADE)
-    cards = models.CharField(max_length=104)
-
-    class Meta:
-        ordering = ['index']
 
 
 class CardType(Enum):
@@ -52,12 +51,12 @@ class Card:
 
         if data:
             if len(data) != 2:
-                raise DataModelException(f'Bad card id: {data}')
+                raise FieldError(f'Bad card id: {data}')
             try:
                 self.type = CardType(data[0])
                 self.suit = CardSuit(data[1])
             except ValueError:
-                raise DataModelException(f'Unknown card id: {data}')
+                raise FieldError(f'Unknown card id: {data}')
         else:
             self.type = kind
             self.suit = suit
@@ -73,10 +72,31 @@ class Card:
         # type: (str) -> List[Card]
         
         if len(cards) % 2 != 0:
-            raise DataModelException(f'Bad length card array: {cards}')
+            raise FieldError(f'Bad length card array: {cards}')
         
         split = [cards[i:i+2] for i in range(0, len(cards), 2)]
         return [Card(s) for s in split]
+
+
+class Game(models.Model):
+    key         = models.CharField(max_length=PK_LEN, primary_key=True, default=gen_key)
+    center_deck = models.TextField(max_length=104)
+    left_deck   = models.TextField(max_length=104)
+    right_deck  = models.TextField(max_length=104)
+    turn        = models.IntegerField()
+
+
+class GamePlayer(models.Model):
+    index  = models.IntegerField()
+    game   = models.ForeignKey(Game, on_delete=models.CASCADE)
+    player = models.ForeignKey(Player, on_delete=models.CASCADE)
+    cards  = models.CharField(max_length=104, default='')
+
+    class Meta:
+        ordering = ['index']
+        indexes = [
+            models.Index(fields=['game', 'player'])
+        ]
 
 
 class GameAction(models.Model):
@@ -88,17 +108,9 @@ class GameAction(models.Model):
 
     index  = models.IntegerField()
     action = models.IntegerField(choices=Type.choices)
+    game   = models.ForeignKey(Game, on_delete=models.CASCADE)
     player = models.ForeignKey(GamePlayer, on_delete=models.CASCADE)
     data   = models.CharField(max_length=256)
 
     class Meta:
         ordering = ['index']
-
-
-class Game(models.Model):
-    center_deck = models.TextField(max_length=104)
-    left_deck   = models.TextField(max_length=104)
-    right_deck  = models.TextField(max_length=104)
-    players     = models.ForeignKey(GamePlayer, on_delete=models.CASCADE)
-    turn        = models.IntegerField()
-    actions     = models.ForeignKey(GameAction, on_delete=models.CASCADE)

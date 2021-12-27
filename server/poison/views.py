@@ -1,7 +1,7 @@
 from django.core.exceptions import BadRequest
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
-from .messages import CreateGameRequest, CreatePlayerRequest, PollGameRequest
+from .messages import CreateGameRequest, CreatePlayerRequest, JoinGameRequest, PollGameRequest, StartGameRequest
 from .models import Game, Player
 from . import game
 
@@ -27,6 +27,22 @@ def create_game(request):
     req = CreateGameRequest(request.body)
     g = game.create_game(req.player_id)
     
+    return JsonResponse(game.encode_game(g, req.player_id))
+
+
+def join_game(request):
+    # type: (HttpRequest) -> JsonResponse
+
+    req = JoinGameRequest(request.body)
+    g = game.join_game(req.game_id, req.player_id)
+    return JsonResponse(game.encode_game(g, req.player_id))
+
+
+def start_game(request):
+    # type: (HttpRequest) -> JsonResponse
+
+    req = StartGameRequest(request.body)
+    g = game.start_game(req.game_id, req.player_id)
     return JsonResponse(game.encode_game(g, req.player_id))
 
 

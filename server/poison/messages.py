@@ -33,6 +33,24 @@ class CreateGameRequest:
         self.player_id = parsed['player_id']
 
 
+class JoinGameRequest:
+    @exception_catcher
+    def __init__(self, blob):
+        #type: (str) -> None
+        parsed = json.loads(blob)
+        self.player_id = parsed['player_id']
+        self.game_id = parsed['game_id']
+
+    
+class StartGameRequest:
+    @exception_catcher
+    def __init__(self, blob):
+        #type: (str) -> None
+        parsed = json.loads(blob)
+        self.player_id = parsed['player_id']
+        self.game_id = parsed['game_id']
+
+
 class PollGameRequest:
     @exception_catcher
     def __init__(self, blob):

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Iterable
 from random import shuffle
 
 from django.core.exceptions import BadRequest
@@ -56,3 +56,64 @@ def create_game(player_id):
     gp.save()
 
     return game
+
+
+def join_game(game_id, player_id):
+    # type: (str, str) -> Game
+
+    try:
+        g = Game.objects.get(pk=game_id) # type: Game
+        player = Player.objects.get(pk=player_id)
+    except Game.DoesNotExist:
+        raise BadRequest(f'Bad game id: {game_id}')
+    except Player.DoesNotExist:
+        raise BadRequest(f'Bad player id: {player_id}')
+
+    if g.turn >= 0:
+        raise BadRequest('Game already started')
+
+    gps = GamePlayer.objects.filter(game__pk=game_id)
+    if len(gps) >= 6:
+        raise BadRequest('Game is full')
+    for gp in gps:
+        if gp.player.key == player_id:
+            return g
+    
+    gp = GamePlayer(index=len(gps), game=g, player=player)
+    gp.save()
+    return g
+
+
+def start_game(game_id, player_id):
+    # type: (str, str) -> Game
+
+    try:
+        g = Game.objects.get(pk=game_id) # type: Game
+        player = GamePlayer.objects.get(game__pk=game_id, player__pk=player_id)
+        if player.index != 0:
+            raise BadRequest('Only the host may start the game')
+    except Game.DoesNotExist:
+        raise BadRequest(f'Bad game id: {game_id}')
+    except GamePlayer.DoesNotExist:
+        raise BadRequest('Not in game')
+
+    if g.turn >= 0:
+        raise BadRequest('Game already started')
+
+    gps = GamePlayer.objects.filter(game__pk=game_id) # type: Iterable[GamePlayer]
+    if len(gps) < 2:
+        raise BadRequest('Not enough players')
+    
+    g.turn = 0
+    deck = Card.get_cards(g.center_deck)
+    for _ in range(0, 7):
+        for p in gps:
+            card = deck.pop(0)
+            p.cards += str(card)
+    g.center_deck = encode_deck(deck)
+
+    for p in gps:
+        p.save()
+    g.save()
+
+    return g

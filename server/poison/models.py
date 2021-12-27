@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import List
 
 from django.db import models
 
@@ -15,6 +16,9 @@ class GamePlayer(models.Model):
     index = models.IntegerField()
     player = models.ForeignKey(Player, on_delete=models.CASCADE)
     cards = models.CharField(max_length=104)
+
+    class Meta:
+        ordering = ['index']
 
 
 class CardType(Enum):
@@ -64,6 +68,16 @@ class Card:
     def __str__(self):
         return f'{self.type.value}{self.suit.value}'
 
+    @staticmethod
+    def get_cards(cards):
+        # type: (str) -> List[Card]
+        
+        if len(cards) % 2 != 0:
+            raise DataModelException(f'Bad length card array: {cards}')
+        
+        split = [cards[i:i+2] for i in range(0, len(cards), 2)]
+        return [Card(s) for s in split]
+
 
 class GameAction(models.Model):
     class Type(models.IntegerChoices):
@@ -76,6 +90,9 @@ class GameAction(models.Model):
     action = models.IntegerField(choices=Type.choices)
     player = models.ForeignKey(GamePlayer, on_delete=models.CASCADE)
     data   = models.CharField(max_length=256)
+
+    class Meta:
+        ordering = ['index']
 
 
 class Game(models.Model):

@@ -1,0 +1,9 @@
+body {
+  background-color: forestgreen;
+}
+
+.error {
+  color: crimson;
+  margin: 0;
+  padding: 0;
+}

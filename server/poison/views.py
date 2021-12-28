@@ -6,6 +6,7 @@ from .messages import (
     CreateGameRequest,
     CreatePlayerRequest,
     JoinGameRequest,
+    PerformActionRequest,
     PollGameRequest,
     StartGameRequest
 )
@@ -82,4 +83,7 @@ def poll_game(request):
 @error_handler
 def perform_action(request):
     # type: (HttpRequest) -> JsonResponse
-    return JsonResponse({})
+
+    req = PerformActionRequest(request.body)
+    g = game.perform_action(req.game_id, req.player_id, req.kind, req.params)
+    return JsonResponse(game.encode_game(g, req.player_id))

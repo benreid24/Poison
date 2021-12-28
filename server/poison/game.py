@@ -1,44 +1,25 @@
 from typing import List, Iterable
 from random import shuffle
+import json
 
+from django.core import exceptions
 from django.core.exceptions import BadRequest
 
-from .models import Card, CardSuit, CardType, Game, GamePlayer, Player
+from .models import Card, CardSuit, CardType, Game, GamePlayer, Player, GameAction
 from .exceptions import (
+    BadTurnException,
     GameAlreadStartedException,
     GameFullException,
     NotInGameException,
     NotEnoughPlayersException,
     NotHostException
 )
+from .actions import play_card, draw_card, call_poison
 
 
 def make_deck():
     # type: () -> List[Card]
     return [Card(kind=t, suit=s) for t in CardType for s in CardSuit]
-
-
-def encode_deck(deck):
-    # type: (List[Card]) -> str
-    return ''.join([str(c) for c in deck])
-
-
-def encode_game(game, player_key):
-    # type: (Game, str) -> dict
-
-    try:
-        gp = GamePlayer.objects.get(game__pk=game.key, player__pk=player_key)
-        return {
-            'key': game.key,
-            'turn': game.turn,
-            'player_key': player_key,
-            'player_index': gp.index,
-            'cards': gp.cards,
-            'left_card': game.left_deck[0:2],
-            'right_card': game.right_deck[0:2]
-        }
-    except Exception:
-        raise BadRequest(f'Invalid player id: {player_key}')
 
 
 def create_game(player_id):
@@ -52,9 +33,9 @@ def create_game(player_id):
     deck = make_deck()
     shuffle(deck)
     game = Game(
-        center_deck=encode_deck(deck[2:]),
-        left_deck=encode_deck(deck[0:1]),
-        right_deck=encode_deck(deck[1:2]),
+        center_deck=Card.encode_deck(deck[2:]),
+        left_deck=Card.encode_deck(deck[0:1]),
+        right_deck=Card.encode_deck(deck[1:2]),
         turn=-1,
     )
     game.save()
@@ -112,15 +93,55 @@ def start_game(game_id, player_id):
         raise NotEnoughPlayersException()
     
     g.turn = 0
-    deck = Card.get_cards(g.center_deck)
+    deck = Card.get_deck(g.center_deck)
     for _ in range(0, 7):
         for p in gps:
             card = deck.pop(0)
             p.cards += str(card)
-    g.center_deck = encode_deck(deck)
+    g.center_deck = Card.encode_deck(deck)
 
     for p in gps:
         p.save()
     g.save()
 
+    return g
+
+
+def perform_action(game_id, player_id, kind, params):
+    # type: (str, str, GameAction.Type, dict) -> Game
+    try:
+        g = Game.objects.get(pk=game_id) # type: Game
+        p = GamePlayer.objects.get(game__pk=game_id, player__pk=player_id) # type: GamePlayer
+    except Game.DoesNotExist:
+        raise BadRequest(f'Bad game id: {game_id}')
+    except GamePlayer.DoesNotExist:
+        raise BadRequest(f'Bad player id: {player_id}')
+
+    if g.turn != p.index and kind != GameAction.Type.PoisonCalled:
+        raise BadTurnException()
+
+    try:
+        if kind == GameAction.Type.CardPlayed:
+            card = params['card']
+            is_right = params['side'] == 'right'
+            play_card(g, p, Card(card), is_right)
+        elif kind == GameAction.Type.CardDrawn:
+            draw_card(g, p)
+        elif kind == GameAction.Type.PoisonCalled:
+            call_poison(g, p)
+    except KeyError as e:
+        raise BadRequest(f'Missing required param: {e}')
+
+    actions = GameAction.objects.filter(game__pk=game_id)
+    a = GameAction(
+        index=len(actions),
+        action=kind,
+        game=g,
+        player=p,
+        data=json.dumps(params)
+    )
+
+    a.save()
+    g.save()
+    p.save()
     return g

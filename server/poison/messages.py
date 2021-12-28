@@ -2,6 +2,8 @@ import json
 
 from django.core.exceptions import BadRequest
 
+from .models import GameAction
+
 
 def exception_catcher(f):
     def wrapper(*args):
@@ -64,4 +66,11 @@ class PerformActionRequest:
     @exception_catcher
     def __init__(self, blob):
         #type: (str) -> None
-        pass
+        parsed = json.loads(blob)
+        self.player_id = parsed['player_id']
+        self.game_id = parsed['game_id']
+        kind = parsed['type'] # type: int
+        if kind not in GameAction.Type:
+            raise BadRequest(f'Invalid action type: {kind}')
+        self.kind = GameAction.Type(kind)
+        self.params = parsed['params']

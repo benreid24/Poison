@@ -4,6 +4,13 @@ from random import shuffle
 from django.core.exceptions import BadRequest
 
 from .models import Card, CardSuit, CardType, Game, GamePlayer, Player
+from .exceptions import (
+    GameAlreadStartedException,
+    GameFullException,
+    NotInGameException,
+    NotEnoughPlayersException,
+    NotHostException
+)
 
 
 def make_deck():
@@ -70,11 +77,11 @@ def join_game(game_id, player_id):
         raise BadRequest(f'Bad player id: {player_id}')
 
     if g.turn >= 0:
-        raise BadRequest('Game already started')
+        raise GameAlreadStartedException()
 
     gps = GamePlayer.objects.filter(game__pk=game_id)
     if len(gps) >= 6:
-        raise BadRequest('Game is full')
+        raise GameFullException()
     for gp in gps:
         if gp.player.key == player_id:
             return g
@@ -91,18 +98,18 @@ def start_game(game_id, player_id):
         g = Game.objects.get(pk=game_id) # type: Game
         player = GamePlayer.objects.get(game__pk=game_id, player__pk=player_id)
         if player.index != 0:
-            raise BadRequest('Only the host may start the game')
+            raise NotHostException()
     except Game.DoesNotExist:
         raise BadRequest(f'Bad game id: {game_id}')
     except GamePlayer.DoesNotExist:
-        raise BadRequest('Not in game')
+        raise NotInGameException()
 
     if g.turn >= 0:
-        raise BadRequest('Game already started')
+        raise GameAlreadStartedException()
 
     gps = GamePlayer.objects.filter(game__pk=game_id) # type: Iterable[GamePlayer]
     if len(gps) < 2:
-        raise BadRequest('Not enough players')
+        raise NotEnoughPlayersException()
     
     g.turn = 0
     deck = Card.get_cards(g.center_deck)

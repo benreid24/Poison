@@ -142,6 +142,7 @@ def call_poison(game, player):
                     if deck[i].is_red() != deck[i-1].is_red():
                         return # TODO - return what happened
                 _draw_cards(game, last_player, 3)
+                last_player.save()
                 return # TODO - return what happened
 
     raise NoPlaysYetException()

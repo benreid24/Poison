@@ -2,7 +2,6 @@ from typing import List, Iterable
 from random import shuffle
 import json
 
-from django.core import exceptions
 from django.core.exceptions import BadRequest
 
 from .models import Card, CardSuit, CardType, Game, GamePlayer, Player, GameAction
@@ -19,7 +18,15 @@ from .actions import play_card, draw_card, call_poison
 
 def make_deck():
     # type: () -> List[Card]
-    return [Card(kind=t, suit=s) for t in CardType for s in CardSuit]
+    deck = []
+    for k in CardType:
+        if k == CardType.Joker:
+            deck.append(Card(kind=k, suit=CardSuit.Hearts))
+            deck.append(Card(kind=k, suit=CardSuit.Hearts))
+            continue
+        for s in CardSuit:
+            deck.append(CardSuit(kind=k, suit=s))
+    return deck
 
 
 def create_game(player_id):
@@ -97,7 +104,7 @@ def start_game(game_id, player_id):
     for _ in range(0, 7):
         for p in gps:
             card = deck.pop(0)
-            p.cards += str(card)
+            p.cards += Card.encode_deck([card])
     g.center_deck = Card.encode_deck(deck)
 
     for p in gps:

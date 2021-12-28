@@ -1,3 +1,4 @@
+from hashlib import new
 from typing import List, Iterable
 from random import shuffle
 import json
@@ -13,8 +14,7 @@ from .exceptions import (
 )
 
 CARD_TO_INT = {
-    CardType.Ace: 0,
-    CardType.One: 1,
+    CardType.Ace: 1,
     CardType.Two: 2,
     CardType.Three: 3,
     CardType.Four: 4,
@@ -37,11 +37,11 @@ def _draw_cards(game, player, n):
     if len(deck) <= n:
         right = Card.get_deck(game.right_deck)
         left = Card.get_deck(game.left_deck)
-        deck.extend(right[1:])
-        deck.extend(left[1:])
+        new_cards = [*left[1:], *right[1:]]
+        shuffle(new_cards)
+        deck.extend(new_cards)
         if len(deck) < n:
             raise OutOfCardsException()
-        shuffle(deck)
         game.left_deck = Card.encode_deck([left[0]])
         game.right_deck = Card.encode_deck([right[0]])
 
@@ -140,9 +140,10 @@ def call_poison(game, player):
             if len(deck) >= 3:
                 for i in range(1, 3):
                     if deck[i].is_red() != deck[i-1].is_red():
+                        _draw_cards(game, player, 3)
                         return # TODO - return what happened
-                _draw_cards(game, last_player, 3)
-                last_player.save()
-                return # TODO - return what happened
+            _draw_cards(game, last_player, 3)
+            last_player.save()
+            return # TODO - return what happened
 
     raise NoPlaysYetException()

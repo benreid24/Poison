@@ -25,7 +25,7 @@ def make_deck():
             deck.append(Card(kind=k, suit=CardSuit.Hearts))
             continue
         for s in CardSuit:
-            deck.append(CardSuit(kind=k, suit=s))
+            deck.append(Card(kind=k, suit=s))
     return deck
 
 
@@ -140,7 +140,7 @@ def perform_action(game_id, player_id, kind, params):
         raise BadRequest(f'Missing required param: {e}')
 
     actions = GameAction.objects.filter(game__pk=game_id)
-    a = GameAction(
+    GameAction.objects.create(
         index=len(actions),
         action=kind,
         game=g,
@@ -148,7 +148,6 @@ def perform_action(game_id, player_id, kind, params):
         data=json.dumps(params)
     )
 
-    a.save()
     g.save()
     p.save()
     return g
